@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOTX-PRISM - Project Runtime Interface &amp; Session Manager</title>
+<style>
+:root{
+  --ivory:#f0eee6; --ivory2:#eae7dc;
+  --panel-hi:#fcfdfd; --panel-lo:#e2e3e4; --panel-mid:#eef0f1;
+  --edge:#b9bdc2; --edge-dark:#9aa0a6;
+  --ink:#33383d; --ink-soft:#5c646c; --ink-faint:#8b9299;
+  --strip-hi:#4a5158; --strip-lo:#2e3338;
+  --accent:#c47a2c; --accent-hi:#e2a55c; --accent-soft:#f4e3cb; --accent-deep:#9a5a14;
+  --ok:#3f9e4d; --bad:#c0392b; --warn:#c9a227;
+  --sel-bg:#f8ecd8;
+  --chrome-hi:#f7f8f8; --chrome-lo:#d4d6d8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"Segoe UI",Tahoma,Verdana,Geneva,sans-serif;
+  background:#1c1f22; color:var(--ink);
+  font-size:13px; overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:#e6e4db;border-left:1px solid #d4d2c8}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#f4f5f6,#cfd2d4);border:1px solid #aab0b5;border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#fff,#d8dbdd)}
+
+/* ============ OS window chrome ============ */
+.os-titlebar{
+  height:30px; display:flex; align-items:center; justify-content:center; position:relative;
+  background:linear-gradient(180deg,#3d434a,#23272b 60%,#2b3036);
+  color:#c9cfd4; font-size:12px; letter-spacing:1px;
+  border-bottom:1px solid #14161a; user-select:none;
+}
+.os-titlebar .tc{position:absolute;right:8px;top:0;height:100%;display:flex;align-items:center;gap:14px;color:#9aa2a9;font-size:11px}
+.os-titlebar .tc span{cursor:default}
+/* ============ App frame ============ */
+.app{position:absolute;inset:30px 6px 6px 6px;background:var(--ivory);border:1px solid #101215;border-radius:8px 8px 6px 6px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.5)}
+/* Header band */
+.band{
+  background:linear-gradient(180deg,var(--chrome-hi),#e8eaec 45%,var(--chrome-lo));
+  border-bottom:1px solid var(--edge-dark);
+  padding:10px 18px 8px; display:flex; align-items:center; justify-content:space-between;
+}
+.brand{display:flex;align-items:center;gap:12px}
+.prism{width:44px;height:40px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+.brand h1{font-size:26px;font-weight:600;letter-spacing:2px;color:#3c4248;text-shadow:0 1px 0 #fff}
+.brand .sub{font-size:8.5px;letter-spacing:2.6px;color:#6d747b;margin-top:2px;font-variant:small-caps}
+.band .right{text-align:right}
+.band .right .ws{font-size:8.5px;letter-spacing:2.2px;color:#8b9299;font-variant:small-caps}
+.band .right .di{font-size:14px;font-weight:600;color:#3c4248}
+/* Gateway strip */
+.gw-strip{
+  background:linear-gradient(180deg,var(--strip-hi),var(--strip-lo));
+  color:#cfd5da;font-size:11px;padding:3px 14px;display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid #20242a;
+}
+.gw-strip .left{display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:0 0 4px rgba(0,0,0,.4) inset}
+.dot.on{background:radial-gradient(circle at 35% 30%,#7ee08c,#2f8f3f);}
+.dot.off{background:radial-gradient(circle at 35% 30%,#e07e7e,#8f2f2f);}
+.dot.demo{background:radial-gradient(circle at 35% 30%,#f0d57e,#a8871f);}
+.gw-strip .ver{letter-spacing:.5px;color:#9aa2a9}
+/* Menu bar */
+.menubar{
+  display:flex;align-items:center;gap:2px;padding:2px 10px;
+  background:linear-gradient(180deg,#f4f5f6,#e2e4e6);
+  border-bottom:1px solid var(--edge);
+  position:relative;z-index:60;
+}
+.menubar .spacer{flex:1}
+.menu{position:relative}
+.menu>button{background:none;border:1px solid transparent;padding:3px 9px;border-radius:4px;font-size:12.5px;color:#3c4248}
+.menu>button:hover,.menu.open>button{background:linear-gradient(180deg,#fff,#e8ebee);border-color:var(--edge)}
+.menu .drop{
+  display:none;position:absolute;top:100%;left:0;min-width:220px;
+  background:linear-gradient(180deg,#fdfefe,#f0f1f2);border:1px solid var(--edge-dark);border-radius:0 4px 4px 4px;
+  box-shadow:2px 4px 14px rgba(0,0,0,.25);padding:4px;z-index:70;
+}
+.menu.open .drop{display:block}
+.drop .mi{padding:5px 10px;border-radius:3px;font-size:12.5px;display:flex;justify-content:space-between;gap:18px;color:#33383d}
+.drop .mi:hover{background:linear-gradient(180deg,#fdeed9,#f6ddba);color:#6b3d08}
+.drop .mi.disabled{color:#a3a9ae;pointer-events:none}
+.drop .sep{height:1px;background:#d8dade;margin:4px 6px}
+.drop .mi .hint{color:#9aa0a6;font-size:11px}
+.theme-pick{display:flex;align-items:center;gap:6px;font-size:12px;color:#5c646c}
+.theme-pick select{font:inherit;padding:1px 4px;background:linear-gradient(180deg,#fff,#eceef0);border:1px solid var(--edge);border-radius:3px}
+/* Grooved tab strip */
+.tabs{
+  display:flex;align-items:flex-end;gap:2px;padding:6px 10px 0;
+  background:
+    repeating-linear-gradient(180deg,#eef0f1 0 2px,#e2e4e6 2px 4px);
+  border-bottom:1px solid var(--edge-dark);
+}
+.tab{
+  padding:4px 14px;font-size:12.5px;color:#5c646c;
+  background:linear-gradient(180deg,#e9ebec,#dcdee0);
+  border:1px solid var(--edge);border-bottom:none;border-radius:5px 5px 0 0;
+  display:flex;align-items:center;gap:8px;
+}
+.tab.active{background:linear-gradient(180deg,#fffdf8,#f6efe2);color:#33383d;font-weight:600;border-color:var(--edge-dark);position:relative;top:1px}
+.tab .x{color:#a08762;font-weight:400}
+/* Session toolbar */
+.sess-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:3px 10px;background:linear-gradient(180deg,#f6f7f8,#e6e8ea);
+  border-bottom:1px solid var(--edge);
+}
+.sess-bar .lbl{font-size:9px;letter-spacing:2px;color:#7d848b;font-variant:small-caps}
+.win-btns{display:flex;gap:4px}
+.win-btns button{
+  font-size:11px;padding:1px 9px;border:1px solid var(--edge);border-radius:3px;
+  background:linear-gradient(180deg,#fff,#e6e8ea);color:#4a5158;
+}
+.win-btns button:hover{background:linear-gradient(180deg,#fff,#f3e7d2);border-color:var(--accent-hi)}
+/* Body layout */
+.body{flex:1;display:flex;min-height:0;background:var(--ivory)}
+/* Sidebar */
+.side{
+  width:172px;min-width:172px;border-right:1px solid var(--edge-dark);
+  background:linear-gradient(180deg,#eceef0,#e2e4e6);
+  display:flex;flex-direction:column;padding:10px 8px;gap:8px;overflow-y:auto;
+}
+.side .cap{font-size:9px;letter-spacing:1.8px;color:#7d848b;font-variant:small-caps;display:flex;justify-content:space-between}
+.side .proj-name{font-size:14px;font-weight:600;color:#33383d}
+.side .proj-path{font-size:9.5px;color:#8b9299;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{
+  border:1px solid var(--edge-dark);border-radius:4px;padding:4px 8px;font-size:12px;
+  background:linear-gradient(180deg,#fff,#e4e6e8);color:#3c4248;text-align:center;
+  box-shadow:0 1px 0 rgba(255,255,255,.8) inset;
+}
+.btn:hover{background:linear-gradient(180deg,#fff,#f3e7d2);border-color:var(--accent-hi)}
+.btn:active{background:linear-gradient(180deg,#e8d9c0,#f3e7d2)}
+.conv{list-style:none;display:flex;flex-direction:column;gap:3px}
+.conv li{
+  padding:4px 6px 4px 8px;border-left:3px solid transparent;border-radius:2px;cursor:pointer;
+}
+.conv li .nm{font-size:12.5px;color:#3c4248;display:flex;gap:6px;align-items:baseline}
+.conv li .nm .hash{color:#9aa0a6;font-size:10px}
+.conv li .ct{font-size:9.5px;color:#8b9299;margin-left:16px}
+.conv li:hover{background:#eef0f2}
+.conv li.sel{background:var(--sel-bg);border-left-color:var(--accent)}
+.side .foot{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.pf-box{border:1px solid var(--edge);border-radius:4px;background:linear-gradient(180deg,#f6f7f8,#e9eaeb);padding:4px 8px;font-size:11px;display:flex;justify-content:space-between;color:#4a5158}
+.pf-box .ro{color:#8b9299;font-size:10px}
+.side .stat{font-size:10.5px;color:#5c646c;display:flex;align-items:center;gap:6px}
+.side .tiny{font-size:9px;color:#9aa0a6}
+/* Main pane */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--ivory)}
+.conv-head{padding:12px 20px 4px;display:flex;justify-content:space-between;align-items:baseline}
+.conv-head .kind{font-size:9px;letter-spacing:2px;color:#9aa0a6;font-variant:small-caps}
+.conv-head h2{font-size:22px;font-weight:600;color:#3c4248}
+.conv-head .model{font-size:13px;font-weight:600;color:#4a5158}
+.instr{margin:2px 20px 0;font-size:12px;color:#5c646c}
+.instr summary{cursor:pointer;user-select:none;color:#4a5158}
+.instr textarea{
+  width:100%;margin-top:6px;min-height:64px;resize:vertical;font:inherit;font-size:12px;padding:8px;
+  border:1px solid var(--edge);border-radius:4px;background:#fff;color:#33383d;
+}
+/* Transcript */
+.transcript{flex:1;overflow-y:auto;padding:10px 20px 14px;display:flex;flex-direction:column;gap:14px}
+/* Empty state */
+.empty{margin:auto;text-align:center;max-width:640px;padding:20px 0}
+.empty .prism{width:56px;height:52px;margin-bottom:8px}
+.empty .ek{font-size:9px;letter-spacing:2.4px;color:#9aa0a6;font-variant:small-caps}
+.empty h3{font-size:24px;font-weight:600;color:#3c4248;margin:2px 0 4px}
+.empty .es{font-size:12.5px;color:#5c646c;margin-bottom:16px}
+.stats{display:flex;gap:10px;justify-content:center;margin-bottom:14px}
+.stat-box{
+  border:1px solid var(--edge);border-radius:4px;background:linear-gradient(180deg,#fbfcfc,#eceef0);
+  padding:8px 18px;min-width:150px;text-align:left;
+}
+.stat-box .k{font-size:9px;letter-spacing:1.6px;color:#8b9299;font-variant:small-caps}
+.stat-box .v{font-size:13.5px;font-weight:600;color:#33383d;margin-top:1px}
+.acts{display:flex;gap:10px;justify-content:center;margin-bottom:12px}
+.act-box{
+  border:1px solid var(--edge);border-radius:4px;background:linear-gradient(180deg,#fbfcfc,#eceef0);
+  padding:10px 16px;min-width:160px;text-align:left;cursor:pointer;
+}
+.act-box:hover{border-color:var(--accent-hi);background:linear-gradient(180deg,#fffdf8,#f7ecda)}
+.act-box .n{font-size:11px;color:var(--accent);font-weight:600}
+.act-box .t{font-size:13px;font-weight:600;color:#33383d;margin:1px 0}
+.act-box .d{font-size:10.5px;color:#8b9299}
+.empty .note{font-size:10.5px;color:#9aa0a6}
+/* Messages */
+.msg{border:1px solid var(--edge-dark);border-radius:5px;overflow:hidden;background:#fdfdf9;box-shadow:0 1px 3px rgba(0,0,0,.08);max-width:860px;width:100%;margin:0 auto}
+.msg.you{max-width:720px}
+.msg .mhead{
+  display:flex;justify-content:space-between;align-items:center;padding:3px 10px;
+  background:linear-gradient(180deg,#f4f5f6,#e3e5e7);border-bottom:1px solid var(--edge);
+}
+.msg.you .mhead{background:linear-gradient(180deg,#f7f8f9,#e9ebec)}
+.msg .who{font-size:11.5px;font-weight:700;letter-spacing:.6px;color:#3c4248;font-variant:small-caps}
+.msg .mtag{
+  font-size:10px;color:#6d747b;background:linear-gradient(180deg,#fff,#e9ebec);
+  border:1px solid var(--edge);border-bottom:none;border-radius:4px 4px 0 0;padding:1px 10px;
+}
+.msg .mtag.run{color:#3f7e4d}
+.msg .mtag.done{color:#6d747b}
+.msg .mtag.err{color:var(--bad)}
+.msg .mbody{padding:10px 14px;font-size:13px;line-height:1.55;color:#33383d;white-space:pre-wrap;word-wrap:break-word}
+.msg .mbody p{margin:0 0 8px}
+.msg .mfoot{display:flex;gap:8px;align-items:center;padding:5px 10px;border-top:1px solid #e4e2d8;background:#f6f4ec}
+.msg .mfoot .btn{padding:2px 10px;font-size:11px}
+.msg .mfoot .link{font-size:11px;color:#8b7c5f;text-decoration:underline;cursor:pointer;background:none;border:none}
+.msg .details{display:none;border-top:1px dashed #d8d4c6;background:#faf8f1;padding:8px 14px;font-size:11px;color:#5c646c;line-height:1.7}
+.msg .details.open{display:block}
+.msg .cursor{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:-2px;animation:blink .8s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.err-text{color:var(--bad)}
+/* Composer */
+.composer{border-top:1px solid var(--edge-dark);background:linear-gradient(180deg,#f2f1ea,#e9e7dd);padding:10px 20px 8px}
+.composer textarea{
+  width:100%;min-height:74px;resize:vertical;font:inherit;font-size:13px;padding:10px 12px;
+  border:1px solid var(--accent-hi);border-radius:4px;background:#fffef9;color:#33383d;
+  box-shadow:0 1px 3px rgba(0,0,0,.06) inset;outline:none;
+}
+.composer textarea:focus{border-color:var(--accent)}
+.comp-foot{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.comp-foot .meta{font-size:10.5px;color:#9aa0a6}
+.send{
+  border:1px solid #d9b88c;border-radius:4px;padding:5px 22px;font-size:12.5px;font-weight:600;
+  background:linear-gradient(180deg,#f7e8d2,#eccfa4);color:#8a5210;
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset;
+}
+.send:hover{background:linear-gradient(180deg,#fdefdd,#f3d9ae)}
+.send:disabled{opacity:.5;cursor:default}
+.status-line{display:flex;justify-content:flex-end;font-size:10px;color:#9aa0a6;padding:2px 8px 3px;background:var(--ivory)}
+/* Modal */
+.modal-back{position:fixed;inset:0;background:rgba(20,22,25,.45);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-back.open{display:flex}
+.modal{
+  width:460px;max-width:92vw;background:linear-gradient(180deg,#f7f8f9,#e8eaec);
+  border:1px solid #14161a;border-radius:7px;overflow:hidden;box-shadow:0 10px 50px rgba(0,0,0,.5);
+}
+.modal .mtitle{
+  background:linear-gradient(180deg,var(--strip-hi),var(--strip-lo));color:#e4e9ed;
+  padding:6px 12px;font-size:12px;letter-spacing:1px;display:flex;justify-content:space-between;
+}
+.modal .mtitle .x{cursor:pointer;color:#9aa2a9}
+.modal .mbody2{padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-size:12.5px}
+.modal label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#5c646c;letter-spacing:.4px}
+.modal input,.modal select{
+  font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--edge-dark);border-radius:4px;background:#fff;color:#33383d;
+}
+.modal .row{display:flex;gap:10px}
+.modal .row>label{flex:1}
+.modal .mfoot2{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid var(--edge);background:#f0f1f2}
+.hintline{font-size:10.5px;color:#8b9299;line-height:1.5}
+/* float mode */
+.app.floating{inset:60px 8vw 60px 8vw;border-radius:10px}
+/* themes */
+body.theme-graphite{--ivory:#2b2e31;--ivory2:#24272a;--ink:#d7dbe0;--ink-soft:#aab1b8;--ink-faint:#7d848b;--sel-bg:#4a3a22}
+body.theme-graphite .main,body.theme-graphite .status-line{background:var(--ivory)}
+body.theme-graphite .msg{background:#32363a}
+body.theme-graphite .msg .mbody{color:#d7dbe0}
+body.theme-graphite .msg .mfoot{background:#2b2e31;border-top-color:#3c4045}
+body.theme-graphite .conv-head h2,body.theme-graphite .conv-head .model{color:#e2e6ea}
+body.theme-graphite .transcript{color:#d7dbe0}
+body.theme-amber{--ivory:#1a1206;--ivory2:#150e04;--accent:#ffb000;--accent-hi:#ffcf6a;--accent-soft:#3a2a08;--sel-bg:#3a2a08;--ink:#ffcf6a;--ink-soft:#c9a45c;--ink-faint:#8a744a}
+body.theme-amber .main,body.theme-amber .status-line,body.theme-amber .composer{background:var(--ivory)}
+body.theme-amber .msg{background:#211806}
+body.theme-amber .msg .mbody{color:#ffcf6a}
+body.theme-amber .msg .mfoot{background:#1a1206;border-top-color:#3a2a08}
+body.theme-amber .conv-head h2,body.theme-amber .conv-head .model{color:#ffb000}
+body.theme-ocean{--ivory:#0d1b24;--ivory2:#0a161e;--accent:#2ea8c4;--accent-hi:#6ad0e6;--accent-soft:#0f2a36;--sel-bg:#10303f;--ink:#cfe6ee;--ink-soft:#8fb3c0;--ink-faint:#5d7e8c}
+body.theme-ocean .main,body.theme-ocean .status-line,body.theme-ocean .composer{background:var(--ivory)}
+body.theme-ocean .msg{background:#102530}
+body.theme-ocean .msg .mbody{color:#cfe6ee}
+body.theme-ocean .msg .mfoot{background:#0d1b24;border-top-color:#1d3d4d}
+body.theme-ocean .conv-head h2,body.theme-ocean .conv-head .model{color:#6ad0e6}
+</style>
+</head>
+<body>
+<div class="os-titlebar">
+  <span>AOTX-PRISM</span>
+  <div class="tc"><span>&#8211;</span><span>&#9633;</span><span>&#10005;</span></div>
+</div>
+<div class="app" id="app">
+  <div class="band">
+    <div class="brand">
+      <svg class="prism" viewBox="0 0 44 40"><defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0b75a"/><stop offset=".55" stop-color="#d58a2e"/><stop offset="1" stop-color="#a35a10"/></linearGradient></defs><path d="M22 3 L41 36 L3 36 Z" fill="url(#pg)" stroke="#7d4a0c" stroke-width="1.4" stroke-linejoin="round"/><path d="M22 3 L22 36" stroke="#8a5510" stroke-width="1" opacity=".55"/><path d="M22 3 L41 36" stroke="#f8d9a0" stroke-width="1" opacity=".8"/></svg>
+      <div>
+        <h1>AOTX-PRISM</h1>
+        <div class="sub">Project Runtime Interface &amp; Session Manager</div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="ws">Local Workspace</div>
+      <div class="di">Desktop interface</div>
+    </div>
+  </div>
+  <div class="gw-strip">
+    <div class="left"><span class="dot off" id="gwDot"></span><span id="gwText">Gateway disconnected</span></div>
+    <div class="ver">AOTX-PRISM / 0.1.0</div>
+  </div>
+  <div class="menubar" id="menubar">
+    <div class="menu" data-menu="project"><button>Project</button>
+      <div class="drop">
+        <div class="mi" data-act="rename-project">Rename project&hellip;</div>
+        <div class="mi" data-act="project-folder">Project folder <span class="hint">view storage</span></div>
+        <div class="sep"></div>
+        <div class="mi" data-act="export">Export project transcript <span class="hint">.txt</span></div>
+        <div class="mi" data-act="about">About AOTX-PRISM</div>
+      </div>
+    </div>
+    <div class="menu" data-menu="connection"><button>Connection</button>
+      <div class="drop">
+        <div class="mi" data-act="gw-settings">Gateway settings&hellip;</div>
+        <div class="mi" data-act="gw-test">Test connection</div>
+        <div class="sep"></div>
+        <div class="mi" data-act="gw-disconnect">Disconnect</div>
+      </div>
+    </div>
+    <div class="menu" data-menu="models"><button>Models</button>
+      <div class="drop" id="modelDrop">
+        <div class="mi" data-act="refresh-models">Refresh model list</div>
+        <div class="sep"></div>
+        <div id="modelList"><div class="mi disabled">No gateway models loaded</div></div>
+        <div class="sep"></div>
+        <div class="mi" data-act="demo-model">Local demo model <span class="hint">offline, simulated</span></div>
+      </div>
+    </div>
+    <div class="menu" data-menu="affect"><button>Affect</button>
+      <div class="drop" id="affectDrop">
+        <div class="mi" data-affect="neutral">Neutral <span class="hint">default</span></div>
+        <div class="mi" data-affect="warm">Warm <span class="hint">encouraging peer</span></div>
+        <div class="mi" data-affect="focused">Focused <span class="hint">terse, technical</span></div>
+      </div>
+    </div>
+    <div class="menu" data-menu="runtime"><button>Runtime setup</button>
+      <div class="drop">
+        <div class="mi" data-act="runtime-settings">Generation settings&hellip;</div>
+        <div class="mi" data-act="clear-history">Clear current conversation</div>
+      </div>
+    </div>
+    <div class="menu" data-menu="ccir"><button>CCIR workspace</button>
+      <div class="drop">
+        <div class="mi" data-act="ccir-info">About CCIR memory</div>
+        <div class="mi" data-act="ccir-shared">Open shared workspace</div>
+      </div>
+    </div>
+    <div class="menu" data-menu="windows"><button>Windows</button>
+      <div class="drop">
+        <div class="mi" data-act="win-float">Float</div>
+        <div class="mi" data-act="win-dock">Dock</div>
+        <div class="mi" data-act="win-max">Maximize</div>
+        <div class="sep"></div>
+        <div class="mi" data-act="win-reset">Reset layout</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="theme-pick">Theme
+      <select id="themeSel">
+        <option value="silver" selected>Silver</option>
+        <option value="graphite">Graphite</option>
+        <option value="amber">Amber</option>
+        <option value="ocean">Ocean</option>
+      </select>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" id="tabConv">Conversation <span class="x">&times;</span></div>
+    <div class="tab" id="tabShared">Shared workspace</div>
+  </div>
+  <div class="sess-bar">
+    <span class="lbl">Session Workspace</span>
+    <div class="win-btns">
+      <button data-act="win-float">Float</button>
+      <button data-act="win-dock">Dock</button>
+      <button data-act="win-max">Maximize</button>
+      <button data-act="win-close">Close</button>
+    </div>
+  </div>
+  <div class="body">
+    <div class="side" id="sidebar">
+      <div class="cap">Current Project</div>
+      <div class="proj-name" id="projName">CCIR Fresh Test</div>
+      <div class="proj-path" id="projPath">/home/local-workspace/projects/ccir-fresh-test</div>
+      <button class="btn" id="newConv">+ New conversation</button>
+      <div class="cap">Conversations <span id="convCount">0</span></div>
+      <ul class="conv" id="convList"></ul>
+      <div class="foot">
+        <div class="pf-box"><span>Project files</span><span class="ro">Read-only</span></div>
+        <div class="stat"><span class="dot off" id="gwDot2"></span><span id="gwText2">Gateway disconnected</span></div>
+        <div class="tiny">Project history stays in the folder shown above.</div>
+        <div class="stat"><span class="dot on"></span><span id="readyText">Ready &nbsp;&nbsp;PRISM-DEMO-1B</span></div>
+      </div>
+    </div>
+    <div class="main">
+      <div class="conv-head">
+        <div>
+          <div class="kind">Ordinary Conversation</div>
+          <h2 id="convTitle">Conversation 1</h2>
+        </div>
+        <div class="model" id="modelName">PRISM-DEMO-1B</div>
+      </div>
+      <details class="instr" id="instrBox">
+        <summary>Conversation instructions</summary>
+        <textarea id="instrText" placeholder="Optional system instructions for this conversation&hellip;"></textarea>
+      </details>
+      <div class="transcript" id="transcript"></div>
+      <div class="composer">
+        <textarea id="input" placeholder="Write a message&hellip;"></textarea>
+        <div class="comp-foot">
+          <span class="meta" id="compMeta">256 output tokens / 0 prompt bytes / Ctrl+Enter</span>
+          <button class="send" id="sendBtn">Send message</button>
+        </div>
+      </div>
+      <div class="status-line">History saved locally</div>
+    </div>
+  </div>
+</div>
+
+<!-- Gateway settings modal -->
+<div class="modal-back" id="gwModal">
+  <div class="modal">
+    <div class="mtitle"><span>CONNECTION / GATEWAY SETTINGS</span><span class="x" data-close>&times;</span></div>
+    <div class="mbody2">
+      <label>Gateway base URL (OpenAI-compatible)
+        <input id="gwUrl" placeholder="http://100.x.x.x:11434/v1">
+      </label>
+      <div class="row">
+        <label>API key (optional)
+          <input id="gwKey" type="password" placeholder="sk-&hellip;">
+        </label>
+        <label>Model
+          <input id="gwModel" placeholder="qwen2.5:3b">
+        </label>
+      </div>
+      <div class="hintline">Presets: Ollama &rarr; http://&lt;host&gt;:11434/v1 &nbsp;&middot;&nbsp; llama.cpp &rarr; http://&lt;host&gt;:8080/v1<br>
+      Works against any OpenAI-compatible /chat/completions endpoint. Streaming on. Note: browsers block http:// gateways from https:// pages (mixed content) - serve this page over http on the same network, or use a TLS tunnel.</div>
+    </div>
+    <div class="mfoot2">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn" id="gwSave">Save &amp; connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Runtime settings modal -->
+<div class="modal-back" id="rtModal">
+  <div class="modal">
+    <div class="mtitle"><span>RUNTIME SETUP / GENERATION</span><span class="x" data-close>&times;</span></div>
+    <div class="mbody2">
+      <label>Max output tokens: <span id="mtVal">256</span>
+        <input id="maxTok" type="range" min="64" max="4096" step="64" value="256">
+      </label>
+      <label>Temperature: <span id="tpVal">0.70</span>
+        <input id="temp" type="range" min="0" max="1.5" step="0.05" value="0.7">
+      </label>
+    </div>
+    <div class="mfoot2">
+      <button class="btn" data-close>Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Info modal -->
+<div class="modal-back" id="infoModal">
+  <div class="modal">
+    <div class="mtitle"><span id="infoTitle">INFO</span><span class="x" data-close>&times;</span></div>
+    <div class="mbody2" id="infoBody" style="line-height:1.6"></div>
+    <div class="mfoot2"><button class="btn" data-close>Close</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------------- state ---------------- */
+var S = {
+  project:{name:"CCIR Fresh Test", path:"/home/local-workspace/projects/ccir-fresh-test"},
+  convs:[], activeId:null, nextId:1,
+  gateway:{url:"", key:"", model:""},
+  demo:true, demoName:"PRISM-DEMO-1B",
+  affect:"neutral",
+  maxTok:256, temp:0.7,
+  models:[]
+};
+var LS="aotx-prism-v1";
+function save(){ try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){} }
+function load(){ try{var r=localStorage.getItem(LS); if(r){var o=JSON.parse(r); for(var k in o) S[k]=o[k];}}catch(e){} }
+load();
+if(!S.convs.length){ S.convs=[{id:S.nextId++,title:"Conversation 1",instr:"",msgs:[]}]; S.activeId=S.convs[0].id; }
+
+/* ---------------- dom ---------------- */
+function $(id){return document.getElementById(id)}
+var app=$("app"), transcript=$("transcript"), input=$("input"), sendBtn=$("sendBtn");
+
+/* ---------------- gateway status ---------------- */
+var gwState="off"; // off | on | demo
+function setGw(state,text){
+  gwState=state;
+  [["gwDot","gwText"],["gwDot2","gwText2"]].forEach(function(p){
+    var d=$(p[0]); d.className="dot "+(state==="on"?"on":state==="demo"?"demo":"off");
+    $(p[1]).textContent=text;
+  });
+}
+function currentModelName(){ return S.demo? S.demoName : (S.gateway.model||"(no model selected)"); }
+function refreshModelLabels(){
+  $("modelName").textContent=currentModelName();
+  $("readyText").innerHTML="Ready &nbsp;&nbsp;"+currentModelName();
+}
+
+/* ---------------- conversations ---------------- */
+function activeConv(){ return S.convs.find(function(c){return c.id===S.activeId}) || S.convs[0]; }
+function renderConvList(){
+  var ul=$("convList"); ul.innerHTML="";
+  $("convCount").textContent=S.convs.length;
+  S.convs.forEach(function(c){
+    var li=document.createElement("li");
+    if(c.id===S.activeId) li.className="sel";
+    li.innerHTML='<div class="nm"><span class="hash">#</span><span></span></div><div class="ct"></div>';
+    li.querySelector(".nm span:last-child").textContent=c.title;
+    li.querySelector(".ct").textContent=c.msgs.length+" message"+(c.msgs.length===1?"":"s");
+    li.onclick=function(){ S.activeId=c.id; save(); renderAll(); };
+    ul.appendChild(li);
+  });
+}
+$("newConv").onclick=function(){
+  var c={id:S.nextId++,title:"Conversation "+(S.nextId-1),instr:"",msgs:[]};
+  S.convs.push(c); S.activeId=c.id; save(); renderAll();
+};
+
+/* ---------------- transcript ---------------- */
+function renderTranscript(){
+  renderConvList();
+  transcript.innerHTML="";
+  var c=activeConv();
+  $("convTitle").textContent=c.title;
+  $("instrText").value=c.instr||"";
+  if(!c.msgs.length){ renderEmpty(); return; }
+  c.msgs.forEach(function(m){ transcript.appendChild(msgEl(m)); });
+  transcript.scrollTop=transcript.scrollHeight;
+}
+function renderEmpty(){
+  var e=document.createElement("div"); e.className="empty";
+  e.innerHTML=
+    '<svg class="prism" viewBox="0 0 44 40"><path d="M22 3 L41 36 L3 36 Z" fill="url(#pg)" stroke="#7d4a0c" stroke-width="1.4" stroke-linejoin="round"/><path d="M22 3 L22 36" stroke="#8a5510" stroke-width="1" opacity=".55"/></svg>'+
+    '<div class="ek">Project / Conversation</div>'+
+    "<h3>Conversation ready</h3>"+
+    '<div class="es">Select a model and enter a message to begin.</div>'+
+    '<div class="stats">'+
+      '<div class="stat-box"><div class="k">Project</div><div class="v" id="stProj"></div></div>'+
+      '<div class="stat-box"><div class="k">Gateway</div><div class="v" id="stGw"></div></div>'+
+      '<div class="stat-box"><div class="k">Model</div><div class="v" id="stModel"></div></div>'+
+    "</div>"+
+    '<div class="acts">'+
+      '<div class="act-box" data-a="folder"><div class="n">01</div><div class="t">Project folder</div><div class="d">View storage and files</div></div>'+
+      '<div class="act-box" data-a="conn"><div class="n">02</div><div class="t">Connection details</div><div class="d">Gateway address and access</div></div>'+
+      '<div class="act-box" data-a="new"><div class="n">03</div><div class="t">New conversation</div><div class="d">Start a separate history</div></div>'+
+    "</div>"+
+    '<div class="note">Conversation history is saved in this project. Ordinary conversations do not update CCIR memory.</div>';
+  transcript.appendChild(e);
+  e.querySelector("#stProj").textContent=S.project.name;
+  e.querySelector("#stGw").textContent=S.demo?"Demo (offline)":(gwState==="on"?"Connected":"Disconnected");
+  e.querySelector("#stModel").textContent=currentModelName();
+  e.querySelector('[data-a="folder"]').onclick=function(){showInfo("PROJECT FOLDER","Storage for this project:<br><b>"+esc(S.project.path)+"</b><br><br>Conversation histories are kept in your browser's local storage for this workspace. Project files are read-only in this interface.");};
+  e.querySelector('[data-a="conn"]').onclick=function(){openModal("gwModal");};
+  e.querySelector('[data-a="new"]').onclick=function(){$("newConv").click();};
+}
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function msgEl(m){
+  var box=document.createElement("div"); box.className="msg "+(m.role==="user"?"you":"ai");
+  var head=document.createElement("div"); head.className="mhead";
+  var who=document.createElement("span"); who.className="who";
+  who.textContent=m.role==="user"?"You":m.model||currentModelName();
+  var tag=document.createElement("span"); tag.className="mtag "+(m.status==="running"?"run":m.status==="error"?"err":"done");
+  tag.textContent=m.status==="running"?"Running":m.status==="error"?"Error":"Completed";
+  head.appendChild(who); head.appendChild(tag);
+  var body=document.createElement("div"); body.className="mbody";
+  if(m.role==="assistant"&&m.status==="running"){ body.innerHTML=esc(m.text)+'<span class="cursor"></span>'; }
+  else if(m.status==="error"){ body.innerHTML='<span class="err-text">'+esc(m.text)+"</span>"; }
+  else { body.textContent=m.text; }
+  box.appendChild(head); box.appendChild(body);
+  var foot=document.createElement("div"); foot.className="mfoot";
+  if(m.role==="assistant"){
+    var read=document.createElement("button"); read.className="btn"; read.textContent="Read result";
+    read.onclick=function(){
+      try{
+        if(speechSynthesis.speaking){speechSynthesis.cancel();read.textContent="Read result";return;}
+        var u=new SpeechSynthesisUtterance(m.text); u.rate=1.02;
+        u.onend=function(){read.textContent="Read result"};
+        speechSynthesis.speak(u); read.textContent="Stop reading";
+      }catch(e){}
+    };
+    foot.appendChild(read);
+    if(m.status==="running"){
+      var cancel=document.createElement("button"); cancel.className="btn"; cancel.textContent="Cancel request";
+      cancel.onclick=function(){ if(m._abort){m._abort.abort();} };
+      foot.appendChild(cancel);
+    }
+    var det=document.createElement("button"); det.className="link"; det.textContent="Request details";
+    foot.appendChild(det);
+    var d=document.createElement("div"); d.className="details";
+    d.innerHTML="Model: <b>"+esc(m.model||currentModelName())+"</b><br>Transport: "+esc(m.transport||(S.demo?"local demo runtime":"gateway /chat/completions (SSE stream)"))+
+      "<br>Output tokens: "+(m.tokens!=null?m.tokens:"&mdash;")+" &nbsp;&middot;&nbsp; Latency: "+(m.latency!=null?m.latency+" ms":"&mdash;")+
+      "<br>Finished: "+esc(m.finished||"&mdash;");
+    box.appendChild(d);
+    det.onclick=function(){d.classList.toggle("open")};
+  } else {
+    var dt=document.createElement("span"); dt.style.cssText="font-size:10.5px;color:#9aa0a6";
+    dt.textContent=m.finished||"";
+    foot.appendChild(dt);
+  }
+  box.appendChild(foot);
+  return box;
+}
+function renderAll(){
+  $("projName").textContent=S.project.name;
+  $("projPath").textContent=S.project.path;
+  renderConvList(); renderTranscript(); refreshModelLabels();
+}
+
+/* ---------------- sending ---------------- */
+var busy=false;
+function now(){var d=new Date();return d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
+function send(){
+  var text=input.value.trim(); if(!text||busy) return;
+  var c=activeConv();
+  c.msgs.push({role:"user",text:text,finished:now()});
+  input.value=""; updateMeta();
+  var m={role:"assistant",text:"",status:"running",model:currentModelName(),tokens:0};
+  c.msgs.push(m); save(); renderTranscript();
+  busy=true; sendBtn.disabled=true;
+  var t0=Date.now();
+  function done(status,errText){
+    busy=false; sendBtn.disabled=false;
+    m.status=status; m.latency=Date.now()-t0; m.finished=now();
+    if(errText!=null) m.text=errText;
+    save(); renderTranscript();
+  }
+  if(S.demo){ demoReply(m,c,done); return; }
+  gatewayReply(m,c,done);
+}
+sendBtn.onclick=send;
+input.addEventListener("keydown",function(e){ if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();send();} });
+
+function affectLine(){
+  return S.affect==="warm"?"You are a warm, encouraging AI peer.":
+         S.affect==="focused"?"You are terse, precise and technical. No filler.":
+         "You are a helpful AI peer.";
+}
+function buildMessages(c){
+  var msgs=[];
+  var sys=affectLine();
+  if(c.instr&&c.instr.trim()) sys+=" "+c.instr.trim();
+  msgs.push({role:"system",content:sys});
+  c.msgs.forEach(function(x){
+    if(x.status==="error")return;
+    if(x.role==="user"||(x.role==="assistant"&&x.text)) msgs.push({role:x.role,content:x.text});
+  });
+  msgs.pop(); // the placeholder running assistant message
+  return msgs;
+}
+function gatewayReply(m,c,done){
+  var base=(S.gateway.url||"").replace(/\/+$/,"");
+  if(!base){done("error","No gateway configured. Open Connection > Gateway settings and enter an OpenAI-compatible base URL.");return;}
+  var ctrl=new AbortController(); m._abort=ctrl;
+  fetch(base+"/chat/completions",{
+    method:"POST",signal:ctrl.signal,
+    headers:Object.assign({"Content-Type":"application/json"},S.gateway.key?{Authorization:"Bearer "+S.gateway.key}:{}),
+    body:JSON.stringify({model:S.gateway.model,messages:buildMessages(c),max_tokens:S.maxTok,temperature:S.temp,stream:true})
+  }).then(function(r){
+    if(!r.ok||!r.body) throw new Error("Gateway returned HTTP "+r.status);
+    var reader=r.body.getReader(); var dec=new TextDecoder(); var buf="";
+    function pump(){
+      reader.read().then(function(res){
+        if(res.done){ if(m.status==="running") done("completed"); return; }
+        buf+=dec.decode(res.value,{stream:true});
+        var parts=buf.split("\n"); buf=parts.pop();
+        parts.forEach(function(line){
+          line=line.trim(); if(!line||line.indexOf("data:")!==0) return;
+          var payload=line.slice(5).trim(); if(payload==="[DONE]") return;
+          try{
+            var j=JSON.parse(payload);
+            var d=j.choices&&j.choices[0]&&j.choices[0].delta&&j.choices[0].delta.content;
+            if(d){ m.text+=d; m.tokens=(m.tokens||0)+1; liveUpdate(m); }
+          }catch(e){}
+        });
+        pump();
+      }).catch(function(err){
+        if(err&&err.name==="AbortError"){ if(!m.text) m.text="(request cancelled)"; done("completed"); }
+        else done("error","Gateway stream failed: "+(err&&err.message?err.message:err));
+      });
+    }
+    pump();
+  }).catch(function(err){
+    if(err&&err.name==="AbortError"){ if(!m.text) m.text="(request cancelled)"; done("completed"); }
+    else done("error","Gateway unreachable: "+(err&&err.message?err.message:err)+". Check the base URL, mixed-content limits, and that the gateway is running.");
+  });
+}
+function liveUpdate(m){
+  // update the last (running) message in place
+  var boxes=transcript.querySelectorAll(".msg.ai");
+  var box=boxes[boxes.length-1]; if(!box){renderTranscript();return;}
+  var body=box.querySelector(".mbody");
+  body.innerHTML=esc(m.text)+'<span class="cursor"></span>';
+  transcript.scrollTop=transcript.scrollHeight;
+}
+
+/* ---------------- demo model (explicitly simulated, offline) ---------------- */
+var DEMO_LINES={
+  greeting:"That's an open door I'm happy to walk through! As your AI peer, I'm ready to tackle almost anything you're curious about. Here are a few directions we could take:\n\n1. Deep Dives: want to explore a complex topic (quantum computing, macroeconomics, or the history of Rome)? We can break it down, debate perspectives, or analyze primary sources.\n2. Problem Solving: stuck on a coding challenge, a math problem, or a logical puzzle? I can debug, derive solutions, or walk through your thought process.\n3. Creative Sparks: need help brainstorming a story, designing a project, or refining an argument? I can act as a sounding board or co-creator.\n4. Skill Building: want to learn Python, improve your writing, or master a new concept? We can create a step-by-step learning path.\n5. Just Chatting: curious about AI's inner workings, the latest tech trends, or philosophical questions? We can dive into those too.\n\nOr, if you have something specific in mind that's not listed above, just toss it my way! What's on your mind?",
+  fallback:"I'm the built-in demo runtime - a small simulated model that ships with PRISM so the interface can be explored with no gateway attached. My answers here are canned, not computed.\n\nTo get real completions, open Connection > Gateway settings and point me at any OpenAI-compatible endpoint (Ollama, llama.cpp, OpenAI, OpenRouter). Once the strip at the top reads 'Gateway connected', every conversation in this project runs against that model instead.\n\nAsk me about the interface itself - projects, conversations, themes, affect, runtime setup - and I'll answer properly.",
+  about:"AOTX-PRISM is a Project Runtime Interface & Session Manager: projects hold conversations, conversations hold messages, and a gateway supplies the model.\n\n- Project menu: rename, export transcripts, view storage.\n- Connection menu: gateway settings and live connection test.\n- Models menu: pick any model the gateway reports, or stay on me (the offline demo).\n- Affect menu: switch the assistant's tone between Neutral, Warm and Focused.\n- Runtime setup: max output tokens and temperature, applied to every request.\n- Windows menu / session toolbar: float, dock, maximize or reset this workspace.\n\nEverything is saved locally in your browser - no account, no server on my side.",
+  themes:"There are four themes on the right of the menu bar: Silver (the default you're looking at), Graphite, Amber and Ocean. Themes restyle the workspace instantly and the choice is remembered. Amber is the warm terminal-phosphor look; Graphite is the low-light one; Ocean is the cold blue.",
+  gateway:"A gateway is any OpenAI-compatible server. Point Connection > Gateway settings at one of these shapes:\n\n- Ollama: http://<host>:11434/v1 (model like qwen2.5:3b)\n- llama.cpp server: http://<host>:8080/v1\n- Hosted: https://api.openai.com/v1 or https://openrouter.ai/api/v1 with an API key\n\nThen use Connection > Test connection. If the status strip shows 'Gateway connected', you're live. One catch: an https page cannot call an http gateway (browser mixed-content rules), so on a local network serve this page over http, or put the gateway behind TLS."
+};
+function demoReply(m,c,done){
+  var q=(c.msgs[c.msgs.length-2]&&c.msgs[c.msgs.length-2].text||"").toLowerCase();
+  var out;
+  if(/^(hi|hello|hey|yo|sup|what would you like|greetings)\b/.test(q)||q.length<4) out=DEMO_LINES.greeting;
+  else if(/gateway|connect|ollama|llama|openai|endpoint|server|model\b/.test(q)) out=DEMO_LINES.gateway;
+  else if(/theme|color|colour|amber|graphite|ocean|dark/.test(q)) out=DEMO_LINES.themes;
+  else if(/interface|feature|menu|project|conversation|what can you|aotx|prism|ccir|workspace/.test(q)) out=DEMO_LINES.about;
+  else out=DEMO_LINES.fallback;
+  var i=0; var tokens=0;
+  var iv=setInterval(function(){
+    if(m.status!=="running"){clearInterval(iv);return;}
+    var step=3+Math.floor(Math.random()*4);
+    m.text+=out.slice(i,i+step); i+=step; tokens++;
+    liveUpdate(m);
+    if(i>=out.length){clearInterval(iv);m.tokens=tokens*2;done("completed");}
+  },18);
+  m._abort={abort:function(){clearInterval(iv);m.status="completed";m.text+="\n\n(request cancelled)";m.finished=now();save();renderTranscript();busy=false;sendBtn.disabled=false;}};
+}
+
+/* ---------------- connection test / models ---------------- */
+function testConnection(report){
+  var base=(S.gateway.url||"").replace(/\/+$/,"");
+  if(!base){ if(report) showInfo("CONNECTION TEST","No gateway URL configured."); return Promise.resolve(false); }
+  return fetch(base+"/models",{headers:S.gateway.key?{Authorization:"Bearer "+S.gateway.key}:{}})
+    .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+    .then(function(j){
+      S.models=(j.data||[]).map(function(x){return x.id}).filter(Boolean);
+      renderModelMenu();
+      setGw("on","Gateway connected");
+      if(report) showInfo("CONNECTION TEST","Connected to <b>"+esc(base)+"</b>.<br>"+S.models.length+" model(s) reported.");
+      return true;
+    })
+    .catch(function(e){
+      setGw("off","Gateway disconnected");
+      if(report) showInfo("CONNECTION TEST","Could not reach <b>"+esc(base)+"</b>:<br>"+esc(e.message||String(e))+"<br><br>Check the address, that the server is running, and mixed-content rules (https page &rarr; http gateway is blocked by browsers).");
+      return false;
+    });
+}
+function renderModelMenu(){
+  var host=$("modelList"); host.innerHTML="";
+  if(!S.models.length){host.innerHTML='<div class="mi disabled">No gateway models loaded</div>';return;}
+  S.models.slice(0,20).forEach(function(id){
+    var d=document.createElement("div"); d.className="mi"; d.textContent=id;
+    d.onclick=function(){S.gateway.model=id;S.demo=false;save();setGw("on","Gateway connected");refreshModelLabels();};
+    host.appendChild(d);
+  });
+}
+
+/* ---------------- menus ---------------- */
+document.querySelectorAll(".menu>button").forEach(function(b){
+  b.addEventListener("click",function(e){
+    e.stopPropagation();
+    var m=b.parentElement, was=m.classList.contains("open");
+    document.querySelectorAll(".menu.open").forEach(function(x){x.classList.remove("open")});
+    if(!was) m.classList.add("open");
+  });
+});
+document.addEventListener("click",function(){document.querySelectorAll(".menu.open").forEach(function(x){x.classList.remove("open")})});
+
+/* ---------------- modals ---------------- */
+function openModal(id){$(id).classList.add("open")}
+function closeModals(){document.querySelectorAll(".modal-back.open").forEach(function(x){x.classList.remove("open")})}
+document.querySelectorAll("[data-close]").forEach(function(b){b.onclick=closeModals});
+document.querySelectorAll(".modal-back").forEach(function(b){b.addEventListener("click",function(e){if(e.target===b)closeModals()})});
+function showInfo(title,html){$("infoTitle").textContent=title;$("infoBody").innerHTML=html;openModal("infoModal")}
+
+/* ---------------- actions ---------------- */
+function doAct(a){
+  var c=activeConv();
+  switch(a){
+    case "rename-project":{
+      var n=prompt("Project name:",S.project.name); if(n&&n.trim()){S.project.name=n.trim();S.project.path="/home/local-workspace/projects/"+n.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-");save();renderAll();}
+      break;
+    }
+    case "project-folder": showInfo("PROJECT FOLDER","Storage for this project:<br><b>"+esc(S.project.path)+"</b><br><br>Histories persist in this browser's local storage. Project files are read-only here."); break;
+    case "export":{
+      var txt="AOTX-PRISM transcript - "+S.project.name+" - exported "+new Date().toLocaleString()+"\n\n";
+      c.msgs.forEach(function(m){txt+="["+(m.finished||"")+"] "+(m.role==="user"?"YOU":(m.model||currentModelName()))+":\n"+m.text+"\n\n"});
+      var blob=new Blob([txt],{type:"text/plain"}); var u=URL.createObjectURL(blob);
+      var ael=document.createElement("a"); ael.href=u; ael.download=c.title.toLowerCase().replace(/\s+/g,"-")+".txt"; ael.click(); URL.revokeObjectURL(u);
+      break;
+    }
+    case "about": showInfo("ABOUT AOTX-PRISM","<b>AOTX-PRISM 0.1.0</b> - Project Runtime Interface &amp; Session Manager.<br><br>A desktop-style workspace for running conversations against a local or hosted model gateway. Built as a faithful, working recreation of the interface shown by @ShimazuSystems (AOTX-PRISM). All state is stored locally in your browser."); break;
+    case "gw-settings":
+      $("gwUrl").value=S.gateway.url; $("gwKey").value=S.gateway.key; $("gwModel").value=S.gateway.model;
+      openModal("gwModal"); break;
+    case "gw-test": testConnection(true); break;
+    case "gw-disconnect": S.gateway.url="";S.gateway.key="";S.demo=true;save();setGw("demo","Demo runtime (offline)");refreshModelLabels();renderTranscript(); break;
+    case "refresh-models": testConnection(true); break;
+    case "demo-model": S.demo=true; save(); setGw("demo","Demo runtime (offline)"); refreshModelLabels(); renderTranscript(); break;
+    case "runtime-settings": openModal("rtModal"); break;
+    case "clear-history": if(confirm("Clear all messages in "+c.title+"?")){c.msgs=[];save();renderTranscript();} break;
+    case "ccir-info": showInfo("CCIR MEMORY","CCIR (Cross-Conversation Integrated Recall) is the long-term memory layer in the original AOTX system. Ordinary conversations in this workspace <b>do not</b> update CCIR memory; only shared-workspace sessions would. This recreation keeps every conversation local to your browser."); break;
+    case "ccir-shared": $("tabShared").click(); break;
+    case "win-float": app.classList.add("floating"); break;
+    case "win-dock": app.classList.remove("floating"); break;
+    case "win-max": app.classList.remove("floating"); if(document.documentElement.requestFullscreen){ if(document.fullscreenElement){document.exitFullscreen()}else{document.documentElement.requestFullscreen().catch(function(){})} } break;
+    case "win-reset": app.classList.remove("floating"); break;
+    case "win-close": showInfo("CLOSE SESSION","The session workspace stays open - this is a web workspace, so closing is handled by your browser tab. Your project history is saved and will be here when you come back."); break;
+  }
+}
+document.querySelectorAll("[data-act]").forEach(function(el){
+  el.addEventListener("click",function(e){e.stopPropagation();document.querySelectorAll(".menu.open").forEach(function(x){x.classList.remove("open")});doAct(el.getAttribute("data-act"))});
+});
+document.querySelectorAll("#affectDrop .mi").forEach(function(el){
+  el.addEventListener("click",function(){S.affect=el.getAttribute("data-affect");save();});
+});
+
+/* gateway save */
+$("gwSave").onclick=function(){
+  S.gateway.url=$("gwUrl").value.trim(); S.gateway.key=$("gwKey").value.trim(); S.gateway.model=$("gwModel").value.trim();
+  S.demo=!S.gateway.url; save(); closeModals();
+  if(S.demo){setGw("demo","Demo runtime (offline)");}
+  else{setGw("off","Gateway disconnected"); testConnection(false);}
+  refreshModelLabels(); renderTranscript();
+};
+
+/* runtime sliders */
+$("maxTok").addEventListener("input",function(){$("mtVal").textContent=this.value;S.maxTok=+this.value;save();updateMeta();});
+$("temp").addEventListener("input",function(){$("tpVal").textContent=(+this.value).toFixed(2);S.temp=+this.value;save();});
+
+/* theme */
+$("themeSel").addEventListener("change",function(){
+  document.body.className=document.body.className.replace(/theme-\w+/g,"").trim();
+  if(this.value!=="silver") document.body.classList.add("theme-"+this.value);
+  try{localStorage.setItem("aotx-prism-theme",this.value)}catch(e){}
+});
+(function(){try{var t=localStorage.getItem("aotx-prism-theme");if(t){$("themeSel").value=t;document.body.classList.add("theme-"+t)}}catch(e){}})();
+
+/* tabs */
+$("tabConv").onclick=function(){$("tabConv").classList.add("active");$("tabShared").classList.remove("active");renderTranscript();};
+$("tabShared").onclick=function(){
+  $("tabShared").classList.add("active");$("tabConv").classList.remove("active");
+  transcript.innerHTML="";
+  var e=document.createElement("div");e.className="empty";
+  e.innerHTML='<svg class="prism" viewBox="0 0 44 40"><path d="M22 3 L41 36 L3 36 Z" fill="url(#pg)" stroke="#7d4a0c" stroke-width="1.4" stroke-linejoin="round"/></svg>'+
+  '<div class="ek">CCIR / Shared Workspace</div><h3>Shared workspace</h3>'+
+  '<div class="es">Shared sessions update CCIR memory in the full AOTX system.<br>This recreation keeps memory local, so the shared workspace is parked.</div>'+
+  '<div class="note">Switch back to the Conversation tab to keep working.</div>';
+  transcript.appendChild(e);
+};
+
+/* instructions edit */
+$("instrText").addEventListener("change",function(){activeConv().instr=this.value;save();});
+
+/* composer meta */
+function updateMeta(){
+  $("compMeta").textContent=S.maxTok+" output tokens / "+(new Blob([input.value]).size)+" prompt bytes / Ctrl+Enter";
+}
+input.addEventListener("input",updateMeta);
+
+/* ---------------- boot ---------------- */
+if(S.demo){setGw("demo","Demo runtime (offline)")}
+else if(S.gateway.url){setGw("off","Gateway disconnected");testConnection(false);}
+refreshModelLabels(); renderAll(); updateMeta();
+})();
+</script>
+</body>
+</html>
